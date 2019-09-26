@@ -301,8 +301,9 @@ def OutputHls(options, media_sources):
         if media_source.spec.get('+audio_fallback') == 'yes':
             media_info['video_track_id'] = 0
 
-        sub_directory = path.join(options.output_dir, options.sub_dir)
-        MakeNewDir(sub_directory)
+        if options.sub_dir:
+            sub_directory = path.join(options.output_dir, options.sub_dir)
+            MakeNewDir(sub_directory)
         # process the source
         out_dir = path.join(options.output_dir, options.sub_dir, media_info['dir'])
         MakeNewDir(out_dir)
