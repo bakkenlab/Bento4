@@ -168,7 +168,7 @@ def AddSegmentTemplate(options, container, init_segment_url, media_url_template_
         args = [container, 'SegmentTemplate']
         kwargs = {'timescale': str(track.timescale),
                   'initialization': init_segment_url,
-                  'media': url_template,
+                  'media': options.sub_dir + url_template,
                   'startNumber': '1'} # (keep the @startNumber, even if not needed, because some clients like Silverlight want it)
 
         segment_template = xml.SubElement(*args, **kwargs)
@@ -192,7 +192,7 @@ def AddSegmentTemplate(options, container, init_segment_url, media_url_template_
                        timescale='1000',
                        duration=str(int(round(track.average_segment_duration*1000))),
                        initialization=init_segment_url,
-                       media=SEGMENT_URL_TEMPLATE,
+                       media=options.sub_dir + SEGMENT_URL_TEMPLATE,
                        startNumber='1') # (keep the @startNumber, even if not needed, because some clients like Silverlight want it)
 
 #############################################
@@ -396,8 +396,8 @@ def OutputDash(options, set_attributes, audio_sets, video_sets, subtitles_sets, 
                 adaptation_set.set('subsegmentStartsWithSAP', '1')
             else:
                 if options.split:
-                    init_segment_url                  = '$RepresentationID$/' + SPLIT_INIT_SEGMENT_NAME
-                    media_segment_url_template_prefix = '$RepresentationID$/'
+                    init_segment_url                  = options.sub_dir + '$RepresentationID$/' + SPLIT_INIT_SEGMENT_NAME
+                    media_segment_url_template_prefix = options.sub_dir + '$RepresentationID$/'
                 else:
                     init_segment_url                  = NOSPLIT_INIT_FILE_PATTERN % ('$RepresentationID$')
                     media_segment_url_template_prefix = ''
@@ -449,8 +449,8 @@ def OutputDash(options, set_attributes, audio_sets, video_sets, subtitles_sets, 
                 adaptation_set.set('subsegmentStartsWithSAP', '1')
             else:
                 if options.split:
-                    init_segment_url                  = '$RepresentationID$/' + SPLIT_INIT_SEGMENT_NAME
-                    media_segment_url_template_prefix = '$RepresentationID$/'
+                    init_segment_url                  = options.sub_dir + '$RepresentationID$/' + SPLIT_INIT_SEGMENT_NAME
+                    media_segment_url_template_prefix = options.sub_dir + '$RepresentationID$/'
                 else:
                     init_segment_url                  = NOSPLIT_INIT_FILE_PATTERN % ('$RepresentationID$')
                     media_segment_url_template_prefix = ''
@@ -521,8 +521,8 @@ def OutputDash(options, set_attributes, audio_sets, video_sets, subtitles_sets, 
                     xml.SubElement(segment_base, 'Initialization', range=str(init_range[0])+'-'+str(init_range[1]))
                 else:
                     if options.split:
-                        init_segment_url                  = '$RepresentationID$/' + SPLIT_INIT_SEGMENT_NAME
-                        media_segment_url_template_prefix = '$RepresentationID$/'
+                        init_segment_url                  = options.sub_dir + '$RepresentationID$/' + SPLIT_INIT_SEGMENT_NAME
+                        media_segment_url_template_prefix = options.sub_dir + '$RepresentationID$/'
                     else:
                         init_segment_url                  = NOSPLIT_INIT_FILE_PATTERN % ('$RepresentationID$')
                         media_segment_url_template_prefix = ''
@@ -567,6 +567,8 @@ def OutputDash(options, set_attributes, audio_sets, video_sets, subtitles_sets, 
         mpd_xml = parseString(xml.tostring(mpd)).toprettyxml("  ")
         # use a regex to fix a bug in toprettyxml() that inserts newlines in text content
         mpd_xml = re.sub(r'((?<=>)(\n[\s]*)(?=[^<\s]))|(?<=[^>\s])(\n[\s]*)(?=<)', '', mpd_xml)
+
+        #Keep this out_dir, since mainfest will go in here
         open(path.join(options.output_dir, options.mpd_filename), "wb").write(mpd_xml)
 
 
@@ -1302,6 +1304,8 @@ def main():
                       help="Print out debugging information")
     parser.add_option('-o', '--output-dir', dest="output_dir",
                       help="Output directory", metavar="<output-dir>", default='output')
+    parser.add_option('', '--sub-dir', dest="sub_dir",
+                      help="Sub directory inside of output directory.", metavar="<sub-dir>", default=False)
     parser.add_option('-f', '--force', dest="force_output", action="store_true",
                       help="Allow output to an existing directory", default=False)
     parser.add_option('', '--mpd-name', dest="mpd_filename",
@@ -1550,6 +1554,10 @@ def main():
     if options.force_output: severity = None
     MakeNewDir(dir=options.output_dir, exit_if_exists = not (options.no_media or options.force_output), severity=severity)
 
+    # create sub directoru
+    if options.sub_dir:
+        sub_directory = path.join(options.output_dir, options.sub_dir)
+        MakeNewDir(dir=sub_directory, exit_if_exists = not (options.no_media or options.force_output), severity=severity)
     # for on-demand, we need to first extract tracks into individual media files
     if options.on_demand:
         (audio_sets, video_sets, subtitles_sets, mp4_files) = SelectTracks(options, media_sources)
@@ -1804,7 +1812,7 @@ def main():
         if options.split:
             for adaptation_sets in [audio_sets, video_sets, subtitles_sets]:
                 for adaptation_set_name, tracks in adaptation_sets.items():
-                    base_dir = options.output_dir
+                    base_dir = path.join(options.output_dir, options.sub_dir)
                     for subdir in adaptation_set_name:
                         base_dir = path.join(base_dir, subdir)
                         MakeNewDir(base_dir)
