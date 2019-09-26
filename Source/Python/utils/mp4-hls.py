@@ -185,7 +185,7 @@ def ProcessSource(options, media_info, out_dir):
     }
 
     if options.base_url != "":
-        kwargs["segment_url_template"] = options.base_url+media_info["dir"]+'/'+'segment-%d.'+file_extension
+        kwargs["segment_url_template"] = options.base_url+options.sub_dir+media_info["dir"]+'/'+'segment-%d.'+file_extension
 
     if options.hls_version != 3:
         kwargs['hls_version'] = str(options.hls_version)
@@ -301,8 +301,10 @@ def OutputHls(options, media_sources):
         if media_source.spec.get('+audio_fallback') == 'yes':
             media_info['video_track_id'] = 0
 
+        sub_directory = path.join(options.output_dir, options.sub_dir)
+        MakeNewDir(sub_directory)
         # process the source
-        out_dir = path.join(options.output_dir, media_info['dir'])
+        out_dir = path.join(options.output_dir, options.sub_dir, media_info['dir'])
         MakeNewDir(out_dir)
         ProcessSource(options, media_info, out_dir)
 
@@ -315,10 +317,10 @@ def OutputHls(options, media_sources):
 
     # process audio tracks
     if len(audio_tracks):
-        MakeNewDir(path.join(options.output_dir, 'audio'))
+        MakeNewDir(path.join(options.output_dir + options.sub_dir, 'audio'))
     for group_id in audio_tracks:
         group = audio_tracks[group_id]
-        MakeNewDir(path.join(options.output_dir, 'audio', group_id))
+        MakeNewDir(path.join(options.output_dir + options.sub_dir, 'audio', group_id))
         for audio_track in group:
             audio_track.media_info = {
                 'source':         audio_track.parent.media_source,
@@ -333,14 +335,13 @@ def OutputHls(options, media_sources):
                 audio_track.media_info['file_extension'] = ComputeCodecName(audio_track.codec_family)
 
             # process the source
-            out_dir = path.join(options.output_dir, 'audio', group_id, audio_track.language)
+            out_dir = path.join(options.output_dir + options.sub_dir, 'audio', group_id, audio_track.language)
             MakeNewDir(out_dir)
             ProcessSource(options, audio_track.media_info, out_dir)
 
     # start the master playlist
     master_playlist = open(path.join(options.output_dir, options.master_playlist_name), "wb+")
     master_playlist.write("#EXTM3U\r\n")
-    master_playlist.write('# Created with Bento4 mp4-hls.py version '+VERSION+'r'+SDK_REVISION+'\r\n')
 
     if options.hls_version >= 4:
         master_playlist.write('\r\n')
@@ -400,7 +401,7 @@ def OutputHls(options, media_sources):
                                       audio_track.media_info['language_name'],
                                       audio_track.media_info['language'],
                                       extra_info,
-                                      options.base_url+audio_track.media_info['dir']+'/'+options.media_playlist_name)).encode('utf-8'))
+                                      options.base_url+options.sub_dir+audio_track.media_info['dir']+'/'+options.media_playlist_name)).encode('utf-8'))
             audio_groups.append({
                 'name':                group_name,
                 'codec':               group_codec,
@@ -444,7 +445,7 @@ def OutputHls(options, media_sources):
                                 int(media_info['stats']['max_segment_bitrate'])+group_info['max_segment_bitrate'],
                                 ','.join(codecs))
             if 'video' in media_info:
-                ext_x_stream_inf += ',FRAME-RATE='+str(media_info['stats']['frame_rate'])+',RESOLUTION='+str(int(media_info['video']['width']))+'x'+str(int(media_info['video']['height']))
+                ext_x_stream_inf += ',RESOLUTION='+str(int(media_info['video']['width']))+'x'+str(int(media_info['video']['height']))
 
             # audio info
             if group_name:
@@ -455,7 +456,7 @@ def OutputHls(options, media_sources):
                 ext_x_stream_inf += ',SUBTITLES="subtitles"'
 
             master_playlist.write(ext_x_stream_inf+'\r\n')
-            master_playlist.write(options.base_url+media['dir']+'/'+options.media_playlist_name+'\r\n')
+            master_playlist.write(options.base_url+options.sub_dir+media['dir']+'/'+options.media_playlist_name+'\r\n')
 
     # write the I-FRAME playlist info
     if not audio_only and options.hls_version >= 4:
@@ -470,7 +471,7 @@ def OutputHls(options, media_sources):
                                         media_info['video']['codec'],
                                         int(media_info['video']['width']),
                                         int(media_info['video']['height']),
-                                        options.base_url+media['dir']+'/'+options.iframe_playlist_name)
+                                        options.base_url+options.sub_dir+media['dir']+'/'+options.iframe_playlist_name)
             master_playlist.write(ext_x_i_frame_stream_inf+'\r\n')
 
 #############################################
@@ -540,6 +541,8 @@ def main():
                       help="Directory where the Bento4 executables are located")
     parser.add_option('', "--base-url", metavar="<base_url>", dest="base_url", default="",
                       help="The base URL for the Media Playlists and TS files listed in the playlists. This is the prefix for the files.")
+    parser.add_option('', "--sub-dir", metavar="<sub_dir>", dest="sub_dir", default="",
+                      help="Subdirectory to store audio and video files. Use case would be to have manifest one level up, but audio and video files one level deeper."  )
     (options, args) = parser.parse_args()
     if len(args) == 0:
         parser.print_help()
